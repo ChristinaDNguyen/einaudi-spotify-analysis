@@ -1,0 +1,27 @@
+{
+    "id": "1383924F",
+    "path": "C:/Users/chris/Downloads/einaudi-spotify-analysis/1. data-import-and-clean-einaudi-track-and-5-metadata-fields.R",
+    "project_path": "1. data-import-and-clean-einaudi-track-and-5-metadata-fields.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1732625772253.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "tempName": "Untitled1",
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "10,18",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1732629513,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1732629513303,
+    "read_only": false,
+    "read_only_alternatives": []
+}

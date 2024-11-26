@@ -1,0 +1,85 @@
+#This project, "einaudi-spotify-analysis", characterizes compositional
+#evolution over time for one neoclassical artist: Ludovico Einaudi. Using the Spotify API for R,
+#<spotifyr>, we pull five key metadata attributes that can tell a story
+#about his compositional evolution over time. The data will include metadata
+#attributes from the 50 most recent albums by this artist.
+
+#Those attributes are duration (duration_ms), tempo (tempo), acousticness
+#(acousticness), instrumentalness (instrumentalness), and key and mode 
+#(key, mode). By looking at these, we track the evolution of track length,
+#explore how pace of compositions change over time, see the balance
+#between acoustic and electronic elements of the music, see the shift between
+#vocal and purely instrumental music, and look for any tonal trends and 
+#shift in harmonic approaches over the course of Einaudi's career.
+
+install.packages("tidyverse")
+devtools::install_github("charlie86/spotifyr")
+
+# Load the libraries
+library(spotifyr)
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(caret)
+library(usethis) #this package allows me to keep my Spotify client ID and secret in the environment rather than here
+devtools::install_github('charlie86/spotifyr')
+
+
+#Set up the API to add my ID and secret ===========================================================
+edit_r_environ()
+
+# Retrieve Spotify credentials from environment variables
+client_id <- Sys.getenv("SPOTIFY_CLIENT_ID")
+client_secret <- Sys.getenv("SPOTIFY_CLIENT_SECRET")
+
+# Check if the credentials are being pulled correctly
+print(client_id)
+print(client_secret)
+
+# Authenticate with Spotify API using the credentials
+access_token <- get_spotify_access_token()  # Automatically uses the credentials
+
+# Check the access token (for debugging purposes)
+print(access_token)
+
+##Pul Einaudi data
+artist_id = "2uFUBdaVGtyMqckSeCl0Qj"
+albums <- get_artist_albums(artist_id, limit = 10)  # Fetch the most recent 10 albums
+
+
+# Extract album IDs
+album_ids <- albums$id
+album_ids
+
+
+# Step 2: Get all tracks for these albums, including album id
+tracks <- map_df(album_ids, function(album_id) {
+  album_tracks <- get_album_tracks(album_id)  # Get tracks for this album
+  
+  # Add the album name for the current album
+  album_name <- albums$items[albums$id == album_id, ]$name
+  album_tracks$album_name <- album_name  # Assign the album name to the track data
+  
+  return(album_tracks)  # Return the updated data frame
+})
+
+tracks
+
+# Step 3: Get audio features for each track
+library(purrr)
+
+track_data <- map_df(tracks$id, function(track_id) {
+  # Fetch the audio features for the track
+  audio_features <- get_track_audio_features(track_id)
+  
+  # Select the relevant columns (audio features)
+  track_info <- tracks %>% 
+    filter(id == track_id) %>%
+    select(name, album_name) %>%
+    bind_cols(audio_features %>%
+                select(duration_ms, tempo, key, mode, acousticness, 
+                       instrumentalness, loudness, speechiness, liveness, time_signature))
+  
+  return(track_info)
+})
+
