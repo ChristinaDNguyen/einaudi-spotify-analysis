@@ -1,65 +1,59 @@
-######## 1. Data import and cleaning: Einaudi track titles for the 3 most
-######## recent albums, and metadata fields: track_name, duration_ms, tempo, 
-######## acousticness, instrumentalness, key, mode).
-
-#Set up the environment.
+#Trying to pull data again
 
 library(spotifyr)
-library(dplyr)
-library(ggplot2)
-library(tidyr)
 library(tidyverse)
-library(caret)
-library(usethis)
-devtools::install_github('charlie86/spotifyr')
+library(lubridate)
 
-###### Authenticate with the API
-edit_r_environ()
+Sys.setenv(SPOTIFY_CLIENT_ID = 'fe8ba20e8c9a4a46b7bf35281257e83d')
+Sys.setenv(SPOTIFY_CLIENT_SECRET = 'b2affa13f0fb45e995e1f3fbc03bd748')
 
-###### Pull data for our single artist slowly so as not to overwhelm the API
-#If we request too much data it will say "! Too Many Requests (RFC 6585)"
-artist_name <- "Ludovido Einaudi"
-
-#Create function to fetch and filter track data for the latest 3 albums
-
-fetch_latest_album_features <- function(artist_name) {
-  # Step 1: Get all albums for the artist
-  albums <- get_artist_albums(artist_name, include_groups = "album")
-  
-  # Step 2: Select the latest 3 albums
-  latest_albums <- albums %>%
-    arrange(desc(release_date)) %>%
-    slice(1:3)
-  
-  # Step 3: Initialize an empty list to store track features
-  all_features <- list()
-  
-  # Step 4: Loop through the latest albums and fetch track features
-  for (album_id in latest_albums$id) {
-    # Get tracks from the album
-    tracks <- get_album_tracks(album_id)
-    
-    # Fetch audio features for the tracks
-    track_features <- get_track_audio_features(tracks$id) %>%
-      select(track_name, duration_ms, tempo, acousticness, instrumentalness, key, mode)
-    
-    # Append to the list
-    all_features[[album_id]] <- track_features
-    
-    # Pause to avoid hitting rate limit
-    Sys.sleep(1)  # Adjust this as needed to stay within Spotify's rate limits
-  }
-  
-  # Combine all features into a single data frame
-  combined_features <- bind_rows(all_features)
-  
-  return(combined_features)
-}
-
-artist_name <- 'Ludovico Einaudi'
-artist_id <- '2uFUBdaVGtyMqckSeCl0Qj'
-latest_features <- fetch_latest_album_features(artist_id) #Even after that
-#function slowing things down to avoid hitting rate limit, I still get this 
-#error, uggggh!
+access_token <- get_spotify_access_token()
+print(access_token)
 
 
+#### Find out what Einaudi's ID is on Spotify so we can refer to him as his
+#### ID from now on.
+einaudi <- search_spotify("Ludovico Einaudi", type = "artist")
+artist_id <- einaudi$id[1]
+
+#### Get the 50 most recent albums of his
+einaudi_albums <- get_artist_albums(artist_id, include_groups = "album", limit = 50)
+
+#### Clean that data from the albums before we can add more audio_features
+simplified_track_data <- map_df(einaudi_albums$id, function(album_id) {
+  get_album_tracks(album_id) %>%
+    select(id, name, duration_ms, external_urls.spotify) %>%
+    mutate(album_id = album_id)  # Add album_id to each track's data
+})
+write_csv(simplified_track_data, "Step1.simplified_track_data.csv")
+
+#### Add the audio features in to the data so we have a whole set
+
+# Function to get audio features in batches
+
+fetch_audio_features_for_tracks <- function(track_ids) {
+  audio_features <- get_track_audio_features(track_ids)
+  return(audio_features)}
+
+# Split track data into manageable batches of 50
+batch_size <- 50
+library(purrr)
+all_audio_features <- map_df(seq(1, nrow(simplified_track_data), by = batch_size), function(i) {
+  track_ids_batch <- simplified_track_data$id[i:min(i + batch_size - 1, nrow(simplified_track_data))]
+  audio_features_batch <- fetch_audio_features_for_tracks(track_ids_batch)
+  left_join(simplified_track_data[i:min(i + batch_size - 1, nrow(simplified_track_data)), ], audio_features_batch, by = "id")
+})
+
+# View the first few rows of merged data
+glimpse(all_audio_features)
+
+write_csv(all_audio_features, "Step2.all_audio_features.csv")
+
+latest_features <- all_audio_features
+
+#### That's our cleaned data, ready for analysis, latest_features
+
+#### Later on in our analysis, if we want, we can isolate for a couple of columns
+#### again.
+
+#### Ongoing issues with rate limits: https://developer.spotify.com/documentation/web-api/concepts/rate-limits
